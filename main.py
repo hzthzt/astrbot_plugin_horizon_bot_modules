@@ -49,10 +49,9 @@ class HorizonBotModules(Star):
 
     # === LLM 拦截 ===
 
-    @filter.on_llm_request()
-    async def _intercept_slash_commands(self, event: AstrMessageEvent, req=None):
+    @filter.on_waiting_llm_request()
+    async def _intercept_slash_commands(self, event: AstrMessageEvent):
         """拦截以 '/' 开头的消息，阻止其发送给大模型。"""
-        # Try multiple ways to get the raw message text
         msg = (event.message_str or "").strip()
         if not msg:
             try:
