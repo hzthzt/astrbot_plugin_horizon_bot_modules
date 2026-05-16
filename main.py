@@ -218,16 +218,17 @@ class HorizonBotModules(Star):
 
     def _register_apis(self):
         """注册页面所需的 API 端点。"""
+        pname = getattr(self, "name", "horizon_bot_modules")
         self.context.register_web_api(
-            "/horizon_bot_modules/api/modules", self._api_list_modules, ["GET"],
+            f"/{pname}/api/modules", self._api_list_modules, ["GET"],
             "列出已安装的模块"
         )
         self.context.register_web_api(
-            "/horizon_bot_modules/api/toggle", self._api_toggle_module, ["POST"],
+            f"/{pname}/api/toggle", self._api_toggle_module, ["POST"],
             "切换模块启用/禁用"
         )
         self.context.register_web_api(
-            "/horizon_bot_modules/api/reload", self._api_reload_modules, ["POST"],
+            f"/{pname}/api/reload", self._api_reload_modules, ["POST"],
             "重载模块"
         )
 
