@@ -62,14 +62,7 @@ class HorizonBotModules(Star):
     @filter.command("hb")
     async def _gateway(self, event: AstrMessageEvent):
         """Horizon Bot 网关。用法: /hb <模块命令> [参数]"""
-        raw = event.message_str.strip()
-        # Strip leading slash and command prefix if present
-        if raw.startswith("/"):
-            raw = raw[1:]
-        prefix = self.command_prefix
-        if raw.startswith(prefix):
-            raw = raw[len(prefix):]
-        message_str = raw.strip()
+        message_str = self._strip_command(event, self.command_prefix)
         if not message_str:
             yield event.plain_result(
                 f"Horizon Bot 模块系统 v{VERSION}\n"
@@ -177,12 +170,8 @@ class HorizonBotModules(Star):
             yield event.plain_result("权限不足。")
             return
 
-        parts = event.message_str.strip().split()
-        if len(parts) < 1:
-            yield event.plain_result("用法: /hb_enable <模块ID>")
-            return
-
-        module_id = parts[0]
+        module_id = self._strip_command(event, "hb_enable")
+        if not module_id:
         if module_id not in self.loader.get_modules():
             yield event.plain_result(f"未知模块: {module_id}")
             return
@@ -202,12 +191,8 @@ class HorizonBotModules(Star):
             yield event.plain_result("权限不足。")
             return
 
-        parts = event.message_str.strip().split()
-        if len(parts) < 1:
-            yield event.plain_result("用法: /hb_disable <模块ID>")
-            return
-
-        module_id = parts[0]
+        module_id = self._strip_command(event, "hb_disable")
+        if not module_id:
         if module_id not in self.loader.get_modules():
             yield event.plain_result(f"未知模块: {module_id}")
             return
@@ -339,6 +324,17 @@ class HorizonBotModules(Star):
         return {"success": True, "count": self.loader.module_count()}
 
     # === 内部方法 ===
+
+    def _strip_command(self, event: AstrMessageEvent, cmd: str) -> str:
+        """从消息中去掉命令前缀，返回参数部分。"""
+        raw = event.message_str.strip()
+        # Strip leading /
+        if raw.startswith("/"):
+            raw = raw[1:]
+        # Strip the command word
+        if raw.startswith(cmd):
+            raw = raw[len(cmd):]
+        return raw.strip()
 
     def _load_modules(self):
         logger.info(f"正在加载 C# 模块，路径: {self.modules_dir}")
