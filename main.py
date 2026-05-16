@@ -8,12 +8,13 @@ import os
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
 from astrbot.api import AstrBotConfig, logger
+from astrbot.core.utils.astrbot_path import get_astrbot_plugin_data_path
 
 from .module_loader import ModuleLoader
 from .command_dispatcher import CommandDispatcher
 from .permission_manager import PermissionManager
 
-VERSION = "1.0.2"
+VERSION = "1.0.3"
 
 
 @register(
@@ -335,10 +336,17 @@ class HorizonBotModules(Star):
         logger.info(f"已加载 {self.loader.module_count()} 个模块")
 
     def _resolve_modules_dir(self) -> str:
-        cfg_path = self.config.get("modules_directory", "./modules")
-        if cfg_path and not os.path.isabs(cfg_path):
-            cfg_path = os.path.join(os.path.dirname(__file__), cfg_path)
-        return os.path.abspath(cfg_path)
+        cfg_path = self.config.get("modules_directory", "")
+        if cfg_path and os.path.isabs(cfg_path):
+            return cfg_path
+        # Default: plugin_data/horizon_bot_modules/modules/ (persists across reinstalls)
+        base = get_astrbot_plugin_data_path()
+        if cfg_path:
+            base = os.path.join(base, cfg_path)
+        else:
+            base = os.path.join(base, "horizon_bot_modules", "modules")
+        os.makedirs(base, exist_ok=True)
+        return os.path.abspath(base)
 
     def _is_admin(self, event: AstrMessageEvent) -> bool:
         admins = self.config.get("admins", [])

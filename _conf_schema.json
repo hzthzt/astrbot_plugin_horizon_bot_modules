@@ -2,8 +2,8 @@
   "modules_directory": {
     "description": "C# 模块 DLL 目录",
     "type": "string",
-    "default": "./modules",
-    "hint": "存放已编译的 C# 模块 DLL 的目录路径。相对路径相对于插件目录。",
+    "default": "",
+    "hint": "存放已编译的 C# 模块 DLL 的目录路径。默认为 plugin_data/horizon_bot_modules/modules/，插件重装不会丢失。也可设置为自定义路径。",
     "obvious_hint": true
   },
   "command_prefix": {
