@@ -2,15 +2,16 @@
 
 基于 pythonnet 加载和管理 C# Horizon Bot 模块的 AstrBot 插件。
 
-**当前版本: v1.0.3** | 发送 `/hb version` 查看运行中版本
+**当前版本: v1.0.4** | 发送 `/hb version` 查看运行中版本
 
 ## 更新日志
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
-| v1.0.3 | 2026-05-16 | 模块 DLL 目录默认改为 `plugin_data/horizon_bot_modules/modules/`，重装插件不再丢失模块；模块管理页面改用 fetch 直接调用 API |
+| v1.0.4 | 2026-05-17 | 修复命令消息解析（/hb/about/help 等）；修复斜杠拦截从原始消息链检测；修复 API 路由动态匹配插件名；模块管理页面改用 bridge SDK；命令参数剥离辅助方法 |
+| v1.0.3 | 2026-05-16 | 模块 DLL 目录默认改为 `plugin_data/horizon_bot_modules/modules/`，重装插件不再丢失模块 |
 | v1.0.2 | 2026-05-16 | 新增模块管理 Dashboard 页面，可扫描、展示、开关模块；配置文件支持模块开关管理 |
-| v1.0.1 | 2026-05-16 | 添加 `/hb version` 命令；隔离模块加载（AssemblyLoadContext），关闭插件时正确释放 DLL 文件锁；拦截斜杠命令防止发送给大模型 |
+| v1.0.1 | 2026-05-16 | 添加 `/hb version` 命令；隔离模块加载（AssemblyLoadContext），关闭插件时正确释放 DLL 文件锁 |
 | v1.0.0 | 2026-05-16 | 初始版本：pythonnet 加载 C# 模块，网关命令分发，群权限管理 |
 
 ## 环境要求

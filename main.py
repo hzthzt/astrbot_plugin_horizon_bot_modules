@@ -16,7 +16,7 @@ from .module_loader import ModuleLoader
 from .command_dispatcher import CommandDispatcher
 from .permission_manager import PermissionManager
 
-VERSION = "1.0.3"
+VERSION = "1.0.4"
 
 
 @register(
