@@ -52,9 +52,15 @@ class HorizonBotModules(Star):
     @filter.on_llm_request()
     async def _intercept_slash_commands(self, event: AstrMessageEvent, req=None):
         """拦截以 '/' 开头的消息，阻止其发送给大模型。"""
-        message_str = (event.message_str or "").strip()
-        if message_str.startswith("/"):
-            logger.info(f"已拦截斜杠命令: {message_str[:80]}")
+        # Try multiple ways to get the raw message text
+        msg = (event.message_str or "").strip()
+        if not msg:
+            try:
+                msg = event.get_plain_text().strip()
+            except Exception:
+                pass
+        if msg.startswith("/"):
+            logger.info(f"已拦截斜杠命令: {msg[:80]}")
             event.stop_event()
 
     # === AstrBot 命令处理 ===
