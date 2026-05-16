@@ -172,6 +172,8 @@ class HorizonBotModules(Star):
 
         module_id = self._strip_command(event, "hb_enable")
         if not module_id:
+            yield event.plain_result("用法: /hb_enable <模块ID>")
+            return
         if module_id not in self.loader.get_modules():
             yield event.plain_result(f"未知模块: {module_id}")
             return
@@ -193,6 +195,8 @@ class HorizonBotModules(Star):
 
         module_id = self._strip_command(event, "hb_disable")
         if not module_id:
+            yield event.plain_result("用法: /hb_disable <模块ID>")
+            return
         if module_id not in self.loader.get_modules():
             yield event.plain_result(f"未知模块: {module_id}")
             return
