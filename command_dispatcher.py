@@ -2,15 +2,17 @@
 Routes incoming messages to the appropriate C# module command handler.
 """
 
+import os
 from typing import Optional
 
 from astrbot.api import logger
 
 
 class CommandDispatcher:
-    def __init__(self, module_loader, permission_manager=None):
+    def __init__(self, module_loader, permission_manager=None, data_base_path=None):
         self.loader = module_loader
         self.permissions = permission_manager
+        self.data_base_path = data_base_path or ""
 
     def parse_message(self, message_str: str):
         """
@@ -48,6 +50,13 @@ class CommandDispatcher:
         ctx.SenderName = event.get_sender_name() or ""
         ctx.GroupId = str(self._extract_group_id(event)) if is_group else ""
         ctx.IsGroupMessage = is_group
+
+        # Set module data path
+        module_id = handler_info["module"].ModuleId
+        if self.data_base_path and module_id:
+            ctx.DataPath = os.path.join(self.data_base_path, module_id)
+        else:
+            ctx.DataPath = ""
 
         descriptor = handler_info["descriptor"]
         try:

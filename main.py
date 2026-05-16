@@ -16,7 +16,7 @@ from .module_loader import ModuleLoader
 from .command_dispatcher import CommandDispatcher
 from .permission_manager import PermissionManager
 
-VERSION = "1.0.5"
+VERSION = "1.0.6"
 
 
 @register(
@@ -36,7 +36,9 @@ class HorizonBotModules(Star):
         self.permissions.load()
 
         self.loader = ModuleLoader(self.modules_dir)
-        self.dispatcher = CommandDispatcher(self.loader, self.permissions)
+        data_base = os.path.join(get_astrbot_plugin_data_path(),
+                                 "horizon_bot_modules", "data")
+        self.dispatcher = CommandDispatcher(self.loader, self.permissions, data_base)
 
         self._register_pages()
         self._register_apis()
