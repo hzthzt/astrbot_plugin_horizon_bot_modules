@@ -18,24 +18,30 @@
     "hint": "可以使用 /hb_reload、/hb_enable、/hb_disable 等管理命令的用户名或 ID 列表。"
   },
   "module_settings": {
-    "description": "模块开关管理",
-    "type": "dict",
-    "hint": "按模块 ID 配置各群的启用/禁用状态。键为模块 ID（如 demo），留空则使用群聊命令 /hb_enable / /hb_disable 管理。",
+    "description": "模块管理（每项配置一个模块的群权限）",
+    "type": "list",
+    "hint": "添加模块配置条目，控制各模块在指定群的启用/禁用状态。也可使用群聊命令 /hb_enable / /hb_disable 动态管理。",
     "items": {
       "type": "object",
-      "description": "模块配置",
+      "description": "单个模块的配置",
       "items": {
-        "enabled_groups": {
-          "description": "启用的群号（白名单模式，留空则不限制）",
-          "type": "list",
-          "default": [],
-          "hint": "只有列表中的群号可以使用该模块的命令"
+        "module_id": {
+          "description": "模块 ID（对应 /hb_list 中显示的 ID）",
+          "type": "string",
+          "default": "",
+          "hint": "如 demo"
         },
         "blocked_groups": {
-          "description": "禁用的群号（黑名单模式）",
+          "description": "禁用的群号",
           "type": "list",
           "default": [],
-          "hint": "列表中的群号禁止使用该模块的命令"
+          "hint": "该模块在列表中的群号内不可用"
+        },
+        "enabled_groups": {
+          "description": "启用的群号（白名单，留空则不限制）",
+          "type": "list",
+          "default": [],
+          "hint": "只有列表中的群号可以使用该模块"
         },
         "private_enabled": {
           "description": "私聊中是否启用",

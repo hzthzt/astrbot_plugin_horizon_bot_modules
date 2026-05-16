@@ -56,13 +56,22 @@ class PermissionManager:
         else:
             return self.is_module_enabled_private(module_id)
 
+    def _get_config_for_module(self, module_id: str) -> dict:
+        """Get config entry for a module from the list-based module_settings."""
+        config_list = self._plugin.config.get("module_settings", [])
+        if not isinstance(config_list, list):
+            return {}
+        for item in config_list:
+            if isinstance(item, dict) and item.get("module_id") == module_id:
+                return item
+        return {}
+
     def is_module_enabled_in_group(self, module_id: str, group_id: str) -> bool:
         """Check if a module is enabled in a specific group. Default: enabled.
         Consults both config (_conf_schema.json module_settings) and KV storage."""
         # 1. Check config-based module_settings (higher priority)
-        config_settings = self._plugin.config.get("module_settings", {})
-        if module_id in config_settings:
-            cfg = config_settings[module_id]
+        cfg = self._get_config_for_module(module_id)
+        if cfg:
             cfg_blocked = list(cfg.get("blocked_groups", []))
             cfg_enabled = list(cfg.get("enabled_groups", []))
             if str(group_id) in [str(g) for g in cfg_blocked]:
@@ -84,9 +93,9 @@ class PermissionManager:
 
     def is_module_enabled_private(self, module_id: str) -> bool:
         """Check if a module is enabled in private chat. Default: enabled."""
-        config_settings = self._plugin.config.get("module_settings", {})
-        if module_id in config_settings:
-            enabled = config_settings[module_id].get("private_enabled", True)
+        cfg = self._get_config_for_module(module_id)
+        if cfg:
+            enabled = cfg.get("private_enabled", True)
             if not enabled:
                 return False
         return True
