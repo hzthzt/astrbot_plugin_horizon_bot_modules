@@ -5,3 +5,6 @@ __pycache__/
 venv/
 .DS_Store
 Thumbs.db
+
+# C# module DLLs (built from horizon-bot repo)
+modules/*.dll
