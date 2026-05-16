@@ -1,5 +1,5 @@
 name: horizon_bot_modules
-desc: Load and manage C# Horizon Bot modules via pythonnet. Provides a gateway for C# module commands through AstrBot.
+desc: 通过 pythonnet 加载和管理 C# Horizon Bot 模块，为 C# 模块命令提供 AstrBot 网关。
 version: 1.0.0
 author: horizon-bot
 support_platforms:

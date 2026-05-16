@@ -1,19 +1,19 @@
 {
   "modules_directory": {
-    "description": "C# module DLL directory",
+    "description": "C# 模块 DLL 目录",
     "type": "string",
     "default": "./modules",
-    "hint": "Path to the directory containing compiled C# module DLLs. Relative paths are relative to the plugin directory."
+    "hint": "存放已编译的 C# 模块 DLL 的目录路径。相对路径相对于插件目录。"
   },
   "command_prefix": {
-    "description": "Gateway command prefix",
+    "description": "网关命令前缀",
     "type": "string",
     "default": "hb",
-    "hint": "The AstrBot command prefix for the Horizon Bot gateway. Commands will be /hb <module_command>"
+    "hint": "Horizon Bot 网关的 AstrBot 命令前缀。命令格式为 /hb <模块命令>"
   },
   "admins": {
-    "description": "Admin users (sender names) who can use admin commands like /hb_reload and /hb_list",
+    "description": "管理员用户",
     "type": "list",
-    "hint": "List of user names or IDs who can use admin commands."
+    "hint": "可以使用 /hb_reload、/hb_enable、/hb_disable 等管理命令的用户名或 ID 列表。"
   }
 }

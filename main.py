@@ -1,6 +1,6 @@
 """
 Horizon Bot Modules — AstrBot Plugin
-Loads and manages C# Horizon Bot modules via pythonnet.
+通过 pythonnet 加载和管理 C# Horizon Bot 模块。
 """
 
 import os
@@ -17,7 +17,7 @@ from .permission_manager import PermissionManager
 @register(
     "horizon_bot_modules",
     "horizon-bot",
-    "Load and manage C# Horizon Bot modules via pythonnet",
+    "通过 pythonnet 加载和管理 C# Horizon Bot 模块",
     "1.0.0",
 )
 class HorizonBotModules(Star):
@@ -36,60 +36,54 @@ class HorizonBotModules(Star):
         self._load_modules()
 
     async def terminate(self):
-        """Called when plugin is unloaded. Shut down all C# modules."""
         for module in self.loader.get_modules().values():
             try:
                 module.Shutdown()
             except Exception as e:
-                logger.error(f"Error shutting down module {module.ModuleId}: {e}")
-        logger.info("HorizonBotModules shut down.")
+                logger.error(f"关闭模块失败 {module.ModuleId}: {e}")
+        logger.info("HorizonBotModules 已关闭。")
 
-    # === LLM Interception ===
+    # === LLM 拦截 ===
 
     @filter.on_llm_request()
     async def _intercept_slash_commands(self, event: AstrMessageEvent):
-        """Block messages starting with '/' from reaching the LLM."""
+        """拦截以 '/' 开头的消息，阻止其发送给大模型。"""
         message_str = event.message_str.strip()
         if message_str.startswith("/"):
-            logger.info(f"Intercepted slash command from LLM: {message_str[:80]}")
+            logger.info(f"已拦截斜杠命令: {message_str[:80]}")
             event.stop_event()
 
-    # === AstrBot Command Handlers ===
+    # === AstrBot 命令处理 ===
 
     @filter.command("hb")
     async def _gateway(self, event: AstrMessageEvent):
-        """Horizon Bot gateway. Usage: /hb <module_command> [args]"""
+        """Horizon Bot 网关。用法: /hb <模块命令> [参数]"""
         message_str = event.message_str.strip()
         if not message_str:
             yield event.plain_result(
-                "Horizon Bot Module System\n"
-                "Usage: /hb <command> [args]\n"
-                "Type /hb help for available commands"
+                "Horizon Bot 模块系统\n"
+                "用法: /hb <命令> [参数]\n"
+                "输入 /hb help 查看可用命令"
             )
             return
 
         command_name, args = self.dispatcher.parse_message(message_str)
         if command_name is None:
-            yield event.plain_result(
-                "Unknown command. Type /hb help for available commands."
-            )
+            yield event.plain_result("未知命令。输入 /hb help 查看可用命令。")
             return
 
         is_group = self._is_group_message(event)
 
-        # Permission check for group messages
         if is_group and not self.permissions.is_command_allowed(
             command_name, event
         ):
-            yield event.plain_result(
-                "This command is not available in this group."
-            )
+            yield event.plain_result("此命令在当前群不可用。")
             return
 
         result = self.dispatcher.dispatch(command_name, args, event, is_group)
 
         if result is None:
-            yield event.plain_result(f"Unknown command: {command_name}")
+            yield event.plain_result(f"未知命令: {command_name}")
             return
 
         msg = getattr(result, "Message", None)
@@ -106,24 +100,24 @@ class HorizonBotModules(Star):
 
     @filter.command("hb_reload")
     async def _reload(self, event: AstrMessageEvent):
-        """Admin command: reload all C# modules from disk."""
+        """管理命令: 从磁盘重载所有 C# 模块。"""
         if not self._is_admin(event):
-            yield event.plain_result("Permission denied.")
+            yield event.plain_result("权限不足。")
             return
 
         self._load_modules()
         count = self.loader.module_count()
-        yield event.plain_result(f"Reloaded {count} module(s).")
+        yield event.plain_result(f"已重载 {count} 个模块。")
 
     @filter.command("hb_list")
     async def _list_modules(self, event: AstrMessageEvent):
-        """List all loaded C# modules."""
+        """列出所有已加载的 C# 模块。"""
         modules = self.loader.get_modules()
         if not modules:
-            yield event.plain_result("No modules loaded.")
+            yield event.plain_result("没有已加载的模块。")
             return
 
-        lines = ["=== Loaded Horizon Bot Modules ==="]
+        lines = ["=== 已加载的 Horizon Bot 模块 ==="]
         for mid, module in modules.items():
             lines.append(
                 f"  [{mid}] {module.ModuleName} v{module.ModuleVersion}"
@@ -133,64 +127,60 @@ class HorizonBotModules(Star):
 
     @filter.command("hb_enable")
     async def _enable(self, event: AstrMessageEvent):
-        """Admin command: enable a module in a group. Usage: /hb_enable <module_id>"""
+        """管理命令: 在当前群启用模块。用法: /hb_enable <模块ID>"""
         if not self._is_admin(event):
-            yield event.plain_result("Permission denied.")
+            yield event.plain_result("权限不足。")
             return
 
         parts = event.message_str.strip().split()
         if len(parts) < 1:
-            yield event.plain_result("Usage: /hb_enable <module_id>")
+            yield event.plain_result("用法: /hb_enable <模块ID>")
             return
 
         module_id = parts[0]
         if module_id not in self.loader.get_modules():
-            yield event.plain_result(f"Unknown module: {module_id}")
+            yield event.plain_result(f"未知模块: {module_id}")
             return
 
         group_id = self._extract_group_id_for_admin(event)
         if not group_id:
-            yield event.plain_result("This command must be used in a group.")
+            yield event.plain_result("此命令需要在群聊中使用。")
             return
 
         self.permissions.enable_module_in_group(module_id, group_id)
-        yield event.plain_result(
-            f"Module '{module_id}' enabled in group {group_id}."
-        )
+        yield event.plain_result(f"模块 '{module_id}' 已在群 {group_id} 中启用。")
 
     @filter.command("hb_disable")
     async def _disable(self, event: AstrMessageEvent):
-        """Admin command: disable a module in a group. Usage: /hb_disable <module_id>"""
+        """管理命令: 在当前群禁用模块。用法: /hb_disable <模块ID>"""
         if not self._is_admin(event):
-            yield event.plain_result("Permission denied.")
+            yield event.plain_result("权限不足。")
             return
 
         parts = event.message_str.strip().split()
         if len(parts) < 1:
-            yield event.plain_result("Usage: /hb_disable <module_id>")
+            yield event.plain_result("用法: /hb_disable <模块ID>")
             return
 
         module_id = parts[0]
         if module_id not in self.loader.get_modules():
-            yield event.plain_result(f"Unknown module: {module_id}")
+            yield event.plain_result(f"未知模块: {module_id}")
             return
 
         group_id = self._extract_group_id_for_admin(event)
         if not group_id:
-            yield event.plain_result("This command must be used in a group.")
+            yield event.plain_result("此命令需要在群聊中使用。")
             return
 
         self.permissions.disable_module_in_group(module_id, group_id)
-        yield event.plain_result(
-            f"Module '{module_id}' disabled in group {group_id}."
-        )
+        yield event.plain_result(f"模块 '{module_id}' 已在群 {group_id} 中禁用。")
 
-    # === Internal ===
+    # === 内部方法 ===
 
     def _load_modules(self):
-        logger.info(f"Loading C# modules from: {self.modules_dir}")
+        logger.info(f"正在加载 C# 模块，路径: {self.modules_dir}")
         self.loader.load_all()
-        logger.info(f"Loaded {self.loader.module_count()} module(s)")
+        logger.info(f"已加载 {self.loader.module_count()} 个模块")
 
     def _resolve_modules_dir(self) -> str:
         cfg_path = self.config.get("modules_directory", "./modules")
