@@ -1,0 +1,19 @@
+{
+  "modules_directory": {
+    "description": "C# module DLL directory",
+    "type": "string",
+    "default": "./modules",
+    "hint": "Path to the directory containing compiled C# module DLLs. Relative paths are relative to the plugin directory."
+  },
+  "command_prefix": {
+    "description": "Gateway command prefix",
+    "type": "string",
+    "default": "hb",
+    "hint": "The AstrBot command prefix for the Horizon Bot gateway. Commands will be /hb <module_command>"
+  },
+  "admins": {
+    "description": "Admin users (sender names) who can use admin commands like /hb_reload and /hb_list",
+    "type": "list",
+    "hint": "List of user names or IDs who can use admin commands."
+  }
+}
