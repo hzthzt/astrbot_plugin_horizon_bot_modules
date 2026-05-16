@@ -146,6 +146,36 @@ class HorizonBotModules(Star):
 
         yield event.plain_result("\n".join(lines))
 
+    @filter.command("hb_help")
+    async def _help(self, event: AstrMessageEvent):
+        """列出所有可用指令。"""
+        lines = [f"=== Horizon Bot 指令 v{VERSION} ===", ""]
+
+        lines.append("【插件指令】")
+        lines.append("  /hb <命令> [参数]   模块命令网关")
+        lines.append("  /hb_help             显示本帮助")
+        lines.append("  /hb_version          查看版本信息")
+        lines.append("  /hb_list             列出已加载模块")
+        lines.append("  /hb_reload           重载所有模块（管理员）")
+        lines.append("  /hb_enable <模块ID>   在当前群启用模块（管理员）")
+        lines.append("  /hb_disable <模块ID>  在当前群禁用模块（管理员）")
+
+        modules = self.loader.get_modules()
+        if modules:
+            lines.append("")
+            lines.append("【已加载模块指令】")
+            for mid, module in modules.items():
+                cmds = module.GetPrivateCommands() or module.GetGroupCommands() or []
+                if cmds:
+                    lines.append(f"  [{mid}] {module.ModuleName} v{module.ModuleVersion}")
+                    for c in cmds:
+                        lines.append(f"    /hb {c.CommandName}  {c.Description}")
+        else:
+            lines.append("")
+            lines.append("【已加载模块指令】无")
+
+        yield event.plain_result("\n".join(lines))
+
     @filter.command("hb_reload")
     async def _reload(self, event: AstrMessageEvent):
         """管理命令: 从磁盘重载所有 C# 模块。"""
