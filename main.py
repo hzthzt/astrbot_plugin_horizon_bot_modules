@@ -5,6 +5,8 @@ Horizon Bot Modules — AstrBot Plugin
 
 import os
 
+from quart import request as quart_request
+
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
 from astrbot.api import AstrBotConfig, logger
@@ -232,7 +234,7 @@ class HorizonBotModules(Star):
             "重载模块"
         )
 
-    async def _api_list_modules(self, request):
+    async def _api_list_modules(self):
         """返回已加载模块列表 + modules 目录中未加载的 DLL 文件名。"""
         try:
             modules = self.loader.get_modules()
@@ -283,10 +285,10 @@ class HorizonBotModules(Star):
 
         return {"modules": result, "files": files}
 
-    async def _api_toggle_module(self, request):
+    async def _api_toggle_module(self):
         """切换模块的启用/禁用（全局，影响私聊）。"""
         try:
-            body = await request.json()
+            body = await quart_request.get_json()
         except Exception:
             return {"success": False, "error": "无效的请求体"}
         module_id = body.get("module_id", "")
@@ -324,7 +326,7 @@ class HorizonBotModules(Star):
         self.permissions.load()
         return {"success": True, "module_id": module_id, "enabled": enabled}
 
-    async def _api_reload_modules(self, request):
+    async def _api_reload_modules(self):
         """重载所有模块。"""
         self._load_modules()
         return {"success": True, "count": self.loader.module_count()}
