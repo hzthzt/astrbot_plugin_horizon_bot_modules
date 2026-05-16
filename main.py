@@ -13,7 +13,7 @@ from .module_loader import ModuleLoader
 from .command_dispatcher import CommandDispatcher
 from .permission_manager import PermissionManager
 
-VERSION = "1.0.1"
+VERSION = "1.0.2"
 
 
 @register(
@@ -34,6 +34,9 @@ class HorizonBotModules(Star):
 
         self.loader = ModuleLoader(self.modules_dir)
         self.dispatcher = CommandDispatcher(self.loader, self.permissions)
+
+        self._register_pages()
+        self._register_apis()
 
         self._load_modules()
 
@@ -206,6 +209,106 @@ class HorizonBotModules(Star):
 
         self.permissions.disable_module_in_group(module_id, group_id)
         yield event.plain_result(f"模块 '{module_id}' 已在群 {group_id} 中禁用。")
+
+    # === 插件页面与 API ===
+
+    def _register_pages(self):
+        """注册插件 Dashboard 页面。"""
+        import os as _os
+        page_dir = _os.path.join(_os.path.dirname(__file__), "pages", "module-manager")
+        if _os.path.isdir(page_dir):
+            try:
+                self.context.register_plugin_page(
+                    "module-manager", "模块管理", page_dir
+                )
+                logger.info("已注册模块管理页面。")
+            except Exception as e:
+                logger.error(f"注册页面失败: {e}")
+
+    def _register_apis(self):
+        """注册页面所需的 API 端点。"""
+        self.context.register_web_api(
+            "/horizon_bot_modules/api/modules", self._api_list_modules, ["GET"],
+            "列出已安装的模块"
+        )
+        self.context.register_web_api(
+            "/horizon_bot_modules/api/toggle", self._api_toggle_module, ["POST"],
+            "切换模块启用/禁用"
+        )
+        self.context.register_web_api(
+            "/horizon_bot_modules/api/reload", self._api_reload_modules, ["POST"],
+            "重载模块"
+        )
+
+    async def _api_list_modules(self, request):
+        """返回已加载模块列表 + modules 目录中未加载的 DLL 文件名。"""
+        modules = self.loader.get_modules()
+        result = []
+        loaded_ids = set()
+        for mid, module in modules.items():
+            loaded_ids.add(mid)
+            result.append({
+                "id": mid,
+                "name": module.ModuleName,
+                "version": module.ModuleVersion,
+                "author": module.ModuleAuthor,
+                "enabled": self.permissions.is_module_enabled_private(mid),
+            })
+
+        # Scan for DLL files not loaded
+        files = []
+        if os.path.isdir(self.modules_dir):
+            for f in sorted(os.listdir(self.modules_dir)):
+                if f.endswith(".dll") and f != "HorizonBot.Library.dll":
+                    files.append(f)
+
+        return {"modules": result, "files": files}
+
+    async def _api_toggle_module(self, request):
+        """切换模块的启用/禁用（全局，影响私聊）。"""
+        try:
+            body = await request.json()
+        except Exception:
+            return {"success": False, "error": "无效的请求体"}
+        module_id = body.get("module_id", "")
+        enabled = body.get("enabled", True)
+
+        if module_id not in self.loader.get_modules():
+            return {"success": False, "error": f"模块 {module_id} 不存在"}
+
+        # Toggle via config-based module_settings
+        cfg_list = self.config.get("module_settings", [])
+        if not isinstance(cfg_list, list):
+            cfg_list = []
+        found = False
+        for item in cfg_list:
+            if isinstance(item, dict) and item.get("module_id") == module_id:
+                item["private_enabled"] = bool(enabled)
+                found = True
+                break
+        if not found:
+            cfg_list.append({
+                "module_id": module_id,
+                "blocked_groups": [],
+                "enabled_groups": [],
+                "private_enabled": bool(enabled),
+            })
+
+        # Save config
+        self.config["module_settings"] = cfg_list
+        try:
+            self.config.save_config()
+        except Exception as e:
+            logger.error(f"保存配置失败: {e}")
+            return {"success": False, "error": str(e)}
+
+        self.permissions.load()
+        return {"success": True, "module_id": module_id, "enabled": enabled}
+
+    async def _api_reload_modules(self, request):
+        """重载所有模块。"""
+        self._load_modules()
+        return {"success": True, "count": self.loader.module_count()}
 
     # === 内部方法 ===
 

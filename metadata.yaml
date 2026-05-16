@@ -1,7 +1,7 @@
 name: astrbot_plugin_horizon_bot_modules
 display_name: Horizon Bot 模块
 desc: 通过 pythonnet 加载和管理 C# Horizon Bot 模块，为 C# 模块命令提供 AstrBot 网关，支持隔离加载与热重载。
-version: v1.0.1
+version: v1.0.2
 author: hzthzt
 repo: https://github.com/hzthzt/astrbot_plugin_horizon_bot_modules
 support_platforms:

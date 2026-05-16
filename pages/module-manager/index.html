@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Horizon Bot 模块管理</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #1a1a2e; color: #eee; padding: 20px; }
+h1 { font-size: 20px; margin-bottom: 4px; }
+.subtitle { color: #888; font-size: 13px; margin-bottom: 20px; }
+.card { background: #16213e; border-radius: 10px; padding: 16px; margin-bottom: 12px; display: flex; align-items: center; gap: 14px; }
+.card-info { flex: 1; }
+.card-name { font-size: 15px; font-weight: 600; }
+.card-meta { font-size: 12px; color: #999; margin-top: 2px; }
+.card-status { font-size: 11px; padding: 2px 8px; border-radius: 10px; display: inline-block; margin-top: 4px; }
+.status-loaded { background: #1b5e20; color: #81c784; }
+.status-file { background: #555; color: #ccc; }
+.toggle { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #555; border-radius: 24px; transition: .3s; }
+.slider:before { content: ""; position: absolute; height: 18px; width: 18px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: .3s; }
+.toggle input:checked + .slider { background: #4caf50; }
+.toggle input:checked + .slider:before { transform: translateX(20px); }
+.toolbar { display: flex; gap: 10px; margin-bottom: 20px; }
+.btn { padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px; }
+.btn-primary { background: #0d47a1; color: #fff; }
+.btn-primary:hover { background: #1565c0; }
+.btn-outline { background: transparent; border: 1px solid #555; color: #ccc; }
+.btn-outline:hover { border-color: #888; color: #fff; }
+.empty { text-align: center; color: #666; padding: 40px; }
+.error { background: #4a1c1c; color: #ef9a9a; padding: 12px; border-radius: 8px; margin-bottom: 16px; }
+.loading { text-align: center; padding: 20px; color: #888; }
+.refresh-time { font-size: 11px; color: #555; margin-top: 16px; text-align: center; }
+</style>
+</head>
+<body>
+<h1>Horizon Bot 模块管理</h1>
+<p class="subtitle">管理已安装的 C# 模块，控制各模块的启用/禁用状态</p>
+
+<div class="toolbar">
+  <button class="btn btn-primary" onclick="refresh()">刷新列表</button>
+  <button class="btn btn-outline" onclick="reloadModules()">重载模块</button>
+</div>
+
+<div id="content"><div class="loading">加载中...</div></div>
+<p class="refresh-time" id="refreshTime"></p>
+
+<script>
+const PLUGIN_NAME = 'horizon_bot_modules';
+var bridge = window.AstrBotPluginPage;
+
+async function init() {
+  await bridge.ready();
+  await refresh();
+}
+
+async function apiGet(path) {
+  try {
+    return await bridge.apiGet(`/${PLUGIN_NAME}${path}`, {});
+  } catch (e) {
+    return null;
+  }
+}
+
+async function apiPost(path, body) {
+  try {
+    return await bridge.apiPost(`/${PLUGIN_NAME}${path}`, body);
+  } catch (e) {
+    return null;
+  }
+}
+
+async function refresh() {
+  document.getElementById('content').innerHTML = '<div class="loading">加载中...</div>';
+  var data = await apiGet('/api/modules');
+  if (!data) {
+    document.getElementById('content').innerHTML = '<div class="error">无法获取模块列表，请检查插件是否已加载。</div>';
+    return;
+  }
+  var modules = data.modules || [];
+  var files = data.files || [];
+  if (modules.length === 0 && files.length === 0) {
+    document.getElementById('content').innerHTML = '<div class="empty">modules 目录为空，请将 C# 模块 DLL 放入 modules 目录后重载。</div>';
+  } else {
+    var html = '';
+    modules.forEach(function(m) {
+      html += renderCard(m.id, m.name, 'v' + m.version, m.author, true, m.enabled);
+    });
+    files.forEach(function(f) {
+      html += renderCard(f, f, '-', '-', false, false);
+    });
+    document.getElementById('content').innerHTML = html;
+  }
+  document.getElementById('refreshTime').textContent = '更新于 ' + new Date().toLocaleTimeString();
+}
+
+function renderCard(id, name, version, author, loaded, enabled) {
+  var statusClass = loaded ? 'status-loaded' : 'status-file';
+  var statusText = loaded ? '已加载' : '未加载（DLL 文件）';
+  var toggleHtml = loaded
+    ? '<label class="toggle"><input type="checkbox" ' + (enabled ? 'checked' : '') + ' onchange="toggleModule(\'' + id + '\', this.checked)"><span class="slider"></span></label>'
+    : '<span style="font-size:11px;color:#888;">需要重载</span>';
+  return '<div class="card">' +
+    '<div class="card-info">' +
+      '<div class="card-name">' + escapeHtml(name) + '</div>' +
+      '<div class="card-meta">' + escapeHtml(id) + ' | ' + escapeHtml(version) + (author && author !== '-' ? ' | by ' + escapeHtml(author) : '') + '</div>' +
+      '<span class="card-status ' + statusClass + '">' + statusText + '</span>' +
+    '</div>' +
+    toggleHtml +
+  '</div>';
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+async function toggleModule(moduleId, enabled) {
+  var resp = await apiPost('/api/toggle', { module_id: moduleId, enabled: enabled });
+  if (resp && resp.success) {
+    refresh();
+  } else {
+    alert('操作失败: ' + ((resp && resp.error) || '未知错误'));
+  }
+}
+
+async function reloadModules() {
+  var resp = await apiPost('/api/reload', {});
+  if (resp && resp.success) {
+    refresh();
+  } else {
+    alert('重载失败');
+  }
+}
+
+init();
+</script>
+</body>
+</html>
