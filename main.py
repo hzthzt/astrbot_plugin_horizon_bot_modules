@@ -13,12 +13,14 @@ from .module_loader import ModuleLoader
 from .command_dispatcher import CommandDispatcher
 from .permission_manager import PermissionManager
 
+VERSION = "1.0.1"
+
 
 @register(
     "horizon_bot_modules",
     "horizon-bot",
     "通过 pythonnet 加载和管理 C# Horizon Bot 模块",
-    "1.0.0",
+    VERSION,
 )
 class HorizonBotModules(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -57,9 +59,10 @@ class HorizonBotModules(Star):
         message_str = event.message_str.strip()
         if not message_str:
             yield event.plain_result(
-                "Horizon Bot 模块系统\n"
+                f"Horizon Bot 模块系统 v{VERSION}\n"
                 "用法: /hb <命令> [参数]\n"
-                "输入 /hb help 查看可用命令"
+                "/hb version  查看版本\n"
+                "/hb help     查看可用命令"
             )
             return
 
@@ -93,6 +96,39 @@ class HorizonBotModules(Star):
             yield event.plain_result(str(err))
         elif msg is not None:
             yield event.plain_result(str(msg))
+
+    @filter.command("hb_version")
+    async def _version(self, event: AstrMessageEvent):
+        """显示插件和模块的版本信息。"""
+        lines = ["=== Horizon Bot Modules ==="]
+        lines.append(f"插件版本: v{VERSION}")
+
+        # Library version
+        try:
+            import clr
+            import System.Reflection
+            for asm in System.AppDomain.CurrentDomain.GetAssemblies():
+                name = asm.GetName()
+                if name.Name == "HorizonBot.Library":
+                    lines.append(f"SDK 版本: v{name.Version}")
+                    break
+        except Exception:
+            pass
+
+        # .NET runtime
+        try:
+            import System
+            lines.append(f".NET 运行时: {System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription}")
+        except Exception:
+            pass
+
+        # Loaded modules
+        modules = self.loader.get_modules()
+        lines.append(f"已加载模块: {len(modules)}")
+        for mid, module in modules.items():
+            lines.append(f"  [{mid}] {module.ModuleName} v{module.ModuleVersion}")
+
+        yield event.plain_result("\n".join(lines))
 
     @filter.command("hb_reload")
     async def _reload(self, event: AstrMessageEvent):
