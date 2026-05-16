@@ -242,25 +242,52 @@ class HorizonBotModules(Star):
 
     async def _api_list_modules(self, request):
         """返回已加载模块列表 + modules 目录中未加载的 DLL 文件名。"""
-        modules = self.loader.get_modules()
-        result = []
-        loaded_ids = set()
-        for mid, module in modules.items():
-            loaded_ids.add(mid)
-            result.append({
-                "id": mid,
-                "name": module.ModuleName,
-                "version": module.ModuleVersion,
-                "author": module.ModuleAuthor,
-                "enabled": self.permissions.is_module_enabled_private(mid),
-            })
+        try:
+            modules = self.loader.get_modules()
+        except Exception as e:
+            logger.error(f"获取模块列表失败: {e}")
+            return {"modules": [], "files": [], "error": str(e)}
 
-        # Scan for DLL files not loaded
+        result = []
+        for mid, module in modules.items():
+            try:
+                result.append({
+                    "id": mid,
+                    "name": module.ModuleName or mid,
+                    "version": module.ModuleVersion or "",
+                    "author": module.ModuleAuthor or "",
+                    "enabled": self.permissions.is_module_enabled_private(mid),
+                })
+            except Exception as e:
+                logger.error(f"读取模块 {mid} 信息失败: {e}")
+                result.append({
+                    "id": mid, "name": mid, "version": "",
+                    "author": "", "enabled": True,
+                })
+
+        # Scan for DLL files that are not already loaded
         files = []
+        loaded_names = {f"{mid}.dll" for mid in modules}
+        # Also match by stripping common prefixes
+        def _dll_module_id(filename):
+            name = filename.replace(".dll", "")
+            # HorizonBot.DemoModule -> demo
+            parts = name.split(".")
+            return parts[-1] if len(parts) > 1 else name
+
+        loaded_simple = {_dll_module_id(f"{mid}.dll") for mid in modules}
+        loaded_simple.add("horizonbot.library")
+
         if os.path.isdir(self.modules_dir):
             for f in sorted(os.listdir(self.modules_dir)):
-                if f.endswith(".dll") and f != "HorizonBot.Library.dll":
-                    files.append(f)
+                if not f.endswith(".dll"):
+                    continue
+                if f == "HorizonBot.Library.dll":
+                    continue
+                simple = f.replace(".dll", "").lower()
+                if simple in loaded_simple:
+                    continue  # Already loaded
+                files.append(f)
 
         return {"modules": result, "files": files}
 
