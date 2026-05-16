@@ -344,10 +344,10 @@ class HorizonBotModules(Star):
             return cfg_path
         # Default: plugin_data/horizon_bot_modules/modules/ (persists across reinstalls)
         base = get_astrbot_plugin_data_path()
-        if cfg_path:
-            base = os.path.join(base, cfg_path)
-        else:
+        if not cfg_path or cfg_path in ("./modules", ".", "modules", "./"):
             base = os.path.join(base, "horizon_bot_modules", "modules")
+        else:
+            base = os.path.join(base, cfg_path)
         os.makedirs(base, exist_ok=True)
         return os.path.abspath(base)
 
