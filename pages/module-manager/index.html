@@ -47,7 +47,6 @@ h1 { font-size: 20px; margin-bottom: 4px; }
 <p class="refresh-time" id="refreshTime"></p>
 
 <script>
-const PLUGIN_NAME = 'horizon_bot_modules';
 var bridge = window.AstrBotPluginPage;
 
 async function init() {
@@ -57,7 +56,7 @@ async function init() {
 
 async function apiGet(path) {
   try {
-    return await bridge.apiGet(`/${PLUGIN_NAME}${path}`, {});
+    return await bridge.apiGet(path, {});
   } catch (e) {
     return null;
   }
@@ -65,7 +64,7 @@ async function apiGet(path) {
 
 async function apiPost(path, body) {
   try {
-    return await bridge.apiPost(`/${PLUGIN_NAME}${path}`, body);
+    return await bridge.apiPost(path, body);
   } catch (e) {
     return null;
   }
