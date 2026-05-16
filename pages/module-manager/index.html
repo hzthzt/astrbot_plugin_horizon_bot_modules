@@ -48,10 +48,14 @@ h1 { font-size: 20px; margin-bottom: 4px; }
 
 <script src="/api/plugin/page/bridge-sdk.js"></script>
 <script>
+var PLUGIN_NAME = 'horizon_bot_modules';
 var bridge = window.AstrBotPluginPage;
+var useBridge = !!bridge;
 
 async function init() {
-  await bridge.ready();
+  if (useBridge) {
+    try { await bridge.ready(); } catch(e) {}
+  }
   await refresh();
 }
 
@@ -60,9 +64,18 @@ var lastApiError = '';
 async function apiGet(path) {
   try {
     lastApiError = '';
-    return await bridge.apiGet(path, {});
-  } catch (e) {
-    lastApiError = e.message || String(e);
+    // Try fetch first (more reliable), fallback to bridge
+    var resp = await fetch('/api/plug/' + PLUGIN_NAME + path);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    return await resp.json();
+  } catch (e1) {
+    if (useBridge) {
+      try { return await bridge.apiGet(path, {}); } catch(e2) {
+        lastApiError = e1.message + ' | bridge: ' + (e2.message || String(e2));
+      }
+    } else {
+      lastApiError = e1.message || String(e1);
+    }
     return null;
   }
 }
@@ -70,9 +83,21 @@ async function apiGet(path) {
 async function apiPost(path, body) {
   try {
     lastApiError = '';
-    return await bridge.apiPost(path, body);
-  } catch (e) {
-    lastApiError = e.message || String(e);
+    var resp = await fetch('/api/plug/' + PLUGIN_NAME + path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    return await resp.json();
+  } catch (e1) {
+    if (useBridge) {
+      try { return await bridge.apiPost(path, body); } catch(e2) {
+        lastApiError = e1.message + ' | bridge: ' + (e2.message || String(e2));
+      }
+    } else {
+      lastApiError = e1.message || String(e1);
+    }
     return null;
   }
 }
