@@ -62,7 +62,14 @@ class HorizonBotModules(Star):
     @filter.command("hb")
     async def _gateway(self, event: AstrMessageEvent):
         """Horizon Bot 网关。用法: /hb <模块命令> [参数]"""
-        message_str = event.message_str.strip()
+        raw = event.message_str.strip()
+        # Strip leading slash and command prefix if present
+        if raw.startswith("/"):
+            raw = raw[1:]
+        prefix = self.command_prefix
+        if raw.startswith(prefix):
+            raw = raw[len(prefix):]
+        message_str = raw.strip()
         if not message_str:
             yield event.plain_result(
                 f"Horizon Bot 模块系统 v{VERSION}\n"
