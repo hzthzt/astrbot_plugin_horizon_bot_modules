@@ -213,17 +213,7 @@ class HorizonBotModules(Star):
     # === 插件页面与 API ===
 
     def _register_pages(self):
-        """注册插件 Dashboard 页面。"""
-        import os as _os
-        page_dir = _os.path.join(_os.path.dirname(__file__), "pages", "module-manager")
-        if _os.path.isdir(page_dir):
-            try:
-                self.context.register_plugin_page(
-                    "module-manager", "模块管理", page_dir
-                )
-                logger.info("已注册模块管理页面。")
-            except Exception as e:
-                logger.error(f"注册页面失败: {e}")
+        """AstrBot 自动扫描 pages/ 目录发现页面，无需手动注册。"""
 
     def _register_apis(self):
         """注册页面所需的 API 端点。"""
