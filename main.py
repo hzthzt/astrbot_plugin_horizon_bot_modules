@@ -36,11 +36,7 @@ class HorizonBotModules(Star):
         self._load_modules()
 
     async def terminate(self):
-        for module in self.loader.get_modules().values():
-            try:
-                module.Shutdown()
-            except Exception as e:
-                logger.error(f"关闭模块失败 {module.ModuleId}: {e}")
+        self.loader.unload_all()
         logger.info("HorizonBotModules 已关闭。")
 
     # === LLM 拦截 ===
