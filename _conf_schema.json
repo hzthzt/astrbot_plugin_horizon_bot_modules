@@ -3,7 +3,8 @@
     "description": "C# 模块 DLL 目录",
     "type": "string",
     "default": "./modules",
-    "hint": "存放已编译的 C# 模块 DLL 的目录路径。相对路径相对于插件目录。"
+    "hint": "存放已编译的 C# 模块 DLL 的目录路径。相对路径相对于插件目录。",
+    "obvious_hint": true
   },
   "command_prefix": {
     "description": "网关命令前缀",
@@ -15,5 +16,34 @@
     "description": "管理员用户",
     "type": "list",
     "hint": "可以使用 /hb_reload、/hb_enable、/hb_disable 等管理命令的用户名或 ID 列表。"
+  },
+  "module_settings": {
+    "description": "模块开关管理",
+    "type": "dict",
+    "hint": "按模块 ID 配置各群的启用/禁用状态。键为模块 ID（如 demo），留空则使用群聊命令 /hb_enable / /hb_disable 管理。",
+    "items": {
+      "type": "object",
+      "description": "模块配置",
+      "items": {
+        "enabled_groups": {
+          "description": "启用的群号（白名单模式，留空则不限制）",
+          "type": "list",
+          "default": [],
+          "hint": "只有列表中的群号可以使用该模块的命令"
+        },
+        "blocked_groups": {
+          "description": "禁用的群号（黑名单模式）",
+          "type": "list",
+          "default": [],
+          "hint": "列表中的群号禁止使用该模块的命令"
+        },
+        "private_enabled": {
+          "description": "私聊中是否启用",
+          "type": "bool",
+          "default": true,
+          "hint": "关闭后该模块在私聊中不可用"
+        }
+      }
+    }
   }
 }

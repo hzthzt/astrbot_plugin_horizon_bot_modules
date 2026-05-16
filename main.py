@@ -73,10 +73,10 @@ class HorizonBotModules(Star):
 
         is_group = self._is_group_message(event)
 
-        if is_group and not self.permissions.is_command_allowed(
-            command_name, event
-        ):
-            yield event.plain_result("此命令在当前群不可用。")
+        if not self.permissions.is_command_allowed(command_name, event, is_group):
+            yield event.plain_result(
+                "此命令在当前群不可用。" if is_group else "此命令在私聊中不可用。"
+            )
             return
 
         result = self.dispatcher.dispatch(command_name, args, event, is_group)

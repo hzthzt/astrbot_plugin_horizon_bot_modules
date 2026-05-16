@@ -30,32 +30,47 @@ class PermissionManager:
         except Exception as e:
             logger.error(f"Failed to save permissions: {e}")
 
-    def is_command_allowed(self, command_name: str, event) -> bool:
-        """Check if a command is allowed in the current group context."""
+    def is_command_allowed(self, command_name: str, event, is_group: bool) -> bool:
+        """Check if a command is allowed in the current context."""
         loader = self._plugin.loader
-        group_id = None
-        try:
-            group_id = str(event.group_id)
-        except Exception:
-            pass
-        if not group_id:
-            try:
-                group_id = str(event.message_obj.group_id)
-            except Exception:
-                pass
-        if not group_id:
-            return True  # Can't determine group, allow
-
-        # Find which module owns this command
-        handler_info = loader.find_handler(command_name, True)
+        handler_info = loader.find_handler(command_name, is_group)
         if handler_info is None:
             return True  # Unknown command, let gateway handle rejection
 
         module_id = handler_info["module"].ModuleId
-        return self.is_module_enabled_in_group(module_id, group_id)
+
+        if is_group:
+            group_id = None
+            try:
+                group_id = str(event.group_id)
+            except Exception:
+                pass
+            if not group_id:
+                try:
+                    group_id = str(event.message_obj.group_id)
+                except Exception:
+                    pass
+            if not group_id:
+                return True
+            return self.is_module_enabled_in_group(module_id, group_id)
+        else:
+            return self.is_module_enabled_private(module_id)
 
     def is_module_enabled_in_group(self, module_id: str, group_id: str) -> bool:
-        """Check if a module is enabled in a specific group. Default: enabled."""
+        """Check if a module is enabled in a specific group. Default: enabled.
+        Consults both config (_conf_schema.json module_settings) and KV storage."""
+        # 1. Check config-based module_settings (higher priority)
+        config_settings = self._plugin.config.get("module_settings", {})
+        if module_id in config_settings:
+            cfg = config_settings[module_id]
+            cfg_blocked = list(cfg.get("blocked_groups", []))
+            cfg_enabled = list(cfg.get("enabled_groups", []))
+            if str(group_id) in [str(g) for g in cfg_blocked]:
+                return False
+            if cfg_enabled:
+                return str(group_id) in [str(g) for g in cfg_enabled]
+
+        # 2. Check KV-stored runtime permissions
         module_perms = self._data.get(module_id, {})
         blocked = module_perms.get("blocked_groups", [])
         if group_id in blocked:
@@ -66,6 +81,15 @@ class PermissionManager:
             return group_id in enabled
 
         return True  # Default: enabled everywhere
+
+    def is_module_enabled_private(self, module_id: str) -> bool:
+        """Check if a module is enabled in private chat. Default: enabled."""
+        config_settings = self._plugin.config.get("module_settings", {})
+        if module_id in config_settings:
+            enabled = config_settings[module_id].get("private_enabled", True)
+            if not enabled:
+                return False
+        return True
 
     def enable_module_in_group(self, module_id: str, group_id: str):
         perms = self._data.setdefault(module_id, {})
