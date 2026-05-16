@@ -54,18 +54,24 @@ async function init() {
   await refresh();
 }
 
+var lastApiError = '';
+
 async function apiGet(path) {
   try {
+    lastApiError = '';
     return await bridge.apiGet(path, {});
   } catch (e) {
+    lastApiError = e.message || String(e);
     return null;
   }
 }
 
 async function apiPost(path, body) {
   try {
+    lastApiError = '';
     return await bridge.apiPost(path, body);
   } catch (e) {
+    lastApiError = e.message || String(e);
     return null;
   }
 }
@@ -74,7 +80,8 @@ async function refresh() {
   document.getElementById('content').innerHTML = '<div class="loading">加载中...</div>';
   var data = await apiGet('/api/modules');
   if (!data) {
-    document.getElementById('content').innerHTML = '<div class="error">无法获取模块列表，请检查插件是否已加载。</div>';
+    var errMsg = lastApiError || '无错误详情';
+    document.getElementById('content').innerHTML = '<div class="error">无法获取模块列表，请检查插件是否已加载。<br><small>错误: ' + escapeHtml(errMsg) + '</small></div>';
     return;
   }
   var modules = data.modules || [];
