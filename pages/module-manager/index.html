@@ -49,57 +49,81 @@ h1 { font-size: 20px; margin-bottom: 4px; }
 <script src="/api/plugin/page/bridge-sdk.js"></script>
 <script>
 var PLUGIN_NAME = 'horizon_bot_modules';
-var bridge = window.AstrBotPluginPage;
-var useBridge = !!bridge;
+var lastApiError = '';
+
+// Debug helper: try multiple API paths
+async function tryFetch(url) {
+  try {
+    var resp = await fetch(url, { credentials: 'include' });
+    var text = await resp.text();
+    try { return JSON.parse(text); } catch(e) { throw new Error('Status ' + resp.status + ': ' + text.substring(0, 100)); }
+  } catch(e) {
+    if (e instanceof TypeError) throw new Error('Fetch error for ' + url + ': ' + e.message);
+    throw e;
+  }
+}
 
 async function init() {
-  if (useBridge) {
-    try { await bridge.ready(); } catch(e) {}
+  var bridge = window.AstrBotPluginPage;
+  if (bridge) {
+    try { await bridge.ready(); } catch(e) { lastApiError = 'bridge ready failed: ' + (e.message || e); }
   }
   await refresh();
 }
 
-var lastApiError = '';
-
 async function apiGet(path) {
-  try {
-    lastApiError = '';
-    // Try fetch first (more reliable), fallback to bridge
-    var resp = await fetch('/api/plug/' + PLUGIN_NAME + path);
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    return await resp.json();
-  } catch (e1) {
-    if (useBridge) {
-      try { return await bridge.apiGet(path, {}); } catch(e2) {
-        lastApiError = e1.message + ' | bridge: ' + (e2.message || String(e2));
-      }
-    } else {
-      lastApiError = e1.message || String(e1);
+  lastApiError = '';
+  // Try all possible URL patterns
+  var urls = [
+    '/api/plug/' + PLUGIN_NAME + path,
+    PLUGIN_NAME + path,
+  ];
+  for (var i = 0; i < urls.length; i++) {
+    try {
+      return await tryFetch(urls[i]);
+    } catch(e) {
+      if (lastApiError) lastApiError += ' | ';
+      lastApiError += urls[i] + ': ' + e.message;
     }
-    return null;
   }
+  // Fallback to bridge
+  var bridge = window.AstrBotPluginPage;
+  if (bridge) {
+    try { return await bridge.apiGet(path, {}); } catch(e) {
+      lastApiError += ' | bridge: ' + (e.message || e);
+    }
+  }
+  return null;
 }
 
 async function apiPost(path, body) {
-  try {
-    lastApiError = '';
-    var resp = await fetch('/api/plug/' + PLUGIN_NAME + path, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    return await resp.json();
-  } catch (e1) {
-    if (useBridge) {
-      try { return await bridge.apiPost(path, body); } catch(e2) {
-        lastApiError = e1.message + ' | bridge: ' + (e2.message || String(e2));
-      }
-    } else {
-      lastApiError = e1.message || String(e1);
+  lastApiError = '';
+  var urls = [
+    '/api/plug/' + PLUGIN_NAME + path,
+    PLUGIN_NAME + path,
+  ];
+  for (var i = 0; i < urls.length; i++) {
+    try {
+      var resp = await fetch(urls[i], {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      var text = await resp.text();
+      try { return JSON.parse(text); } catch(e) { throw new Error('Status ' + resp.status + ': ' + text.substring(0, 100)); }
+    } catch(e) {
+      if (lastApiError) lastApiError += ' | ';
+      lastApiError += urls[i] + ': ' + e.message;
     }
-    return null;
   }
+  var bridge = window.AstrBotPluginPage;
+  if (bridge) {
+    try { return await bridge.apiPost(path, body); } catch(e) {
+      lastApiError += ' | bridge: ' + (e.message || e);
+    }
+  }
+  return null;
 }
 
 async function refresh() {
