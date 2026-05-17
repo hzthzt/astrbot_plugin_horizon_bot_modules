@@ -72,8 +72,8 @@ class HorizonBotModules(Star):
             event.stop_event()
 
     @filter.on_waiting_llm_request()
-    async def _handle_pending_image(self, event: AstrMessageEvent):
-        """Intercept image messages when a module is waiting for one."""
+    async def _handle_pending_interaction(self, event: AstrMessageEvent):
+        """三阶段交互拦截: 在等候用户输入期间，拦截其所有消息防止到达 LLM。"""
         user_id = str(event.get_sender_id())
         if user_id not in self._pending_images:
             return
@@ -89,8 +89,30 @@ class HorizonBotModules(Star):
         if user_id not in self._pending_images:
             return
 
-        # Check if message contains an image
+        pending = self._pending_images[user_id]
+        stage = pending.get("stage", "waiting_image")
+
+        # Check if user sent another /hb command → reset pending state
+        raw_text = ""
+        try:
+            for comp in event.message_obj.message:
+                text = getattr(comp, "text", None)
+                if text:
+                    raw_text += text
+        except Exception:
+            pass
+        msg_text = raw_text.strip() or (event.message_str or "").strip()
+        if msg_text.startswith("/"):
+            # Let the command through, clear pending state
+            del self._pending_images[user_id]
+            return
+
+        # All other messages from this user are intercepted (stop LLM)
+        event.stop_event()
+
         from astrbot.api.message_components import Image
+
+        # Extract image if present
         image_path = None
         try:
             for comp in event.message_obj.message:
@@ -98,68 +120,95 @@ class HorizonBotModules(Star):
                     image_path = await comp.convert_to_file_path()
                     break
         except Exception as e:
-            logger.error(f"Error extracting image from pending request: {e}")
+            logger.error(f"Error extracting image: {e}")
+
+        if stage == "waiting_image":
+            if image_path:
+                # Advance to waiting_prompt stage
+                pending["stage"] = "waiting_prompt"
+                pending["image_path"] = image_path
+                pending["timestamp"] = _time.time()
+                yield event.plain_result("已收到图片，请发送生成描述（prompt）。")
+            else:
+                yield event.plain_result("请先发送图片素材。")
             return
 
-        if not image_path:
-            return  # User sent text, not an image -- let it pass through
+        if stage == "waiting_prompt":
+            if image_path:
+                yield event.plain_result("请发送提示词文字，而非图片。")
+                return
 
-        event.stop_event()
+            # Got text prompt — now dispatch to C# handler
+            prompt_text = event.message_str.strip() if event.message_str else ""
+            if not prompt_text:
+                yield event.plain_result("请发送生成描述（prompt）。")
+                return
 
-        pending = self._pending_images.pop(user_id)
-        command_name = pending["command_name"]
-        args = pending["args"]
-        is_group = pending["is_group"]
+            command_name = pending["command_name"]
+            is_group = pending["is_group"]
+            stored_image_path = pending.get("image_path", "")
 
-        logger.info(
-            f"Processing pending image from user {user_id} "
-            f"for command '{command_name}'"
-        )
+            # Build args: original command + prompt
+            original_args = pending.get("args", [])
+            args = list(original_args) + [prompt_text]
 
-        result = self.dispatcher.dispatch(
-            command_name, args, event, is_group,
-            image_path=image_path, image_source="upload"
-        )
+            logger.info(
+                f"Dispatching img2img for user {user_id}: "
+                f"image={stored_image_path}, prompt={prompt_text}"
+            )
 
-        if result is None:
-            yield event.plain_result(f"处理图片时出错: 未知命令 {command_name}")
-            return
+            del self._pending_images[user_id]
 
-        def _get_field(obj, name, default=None):
-            val = getattr(obj, name, None)
-            if val is None and isinstance(obj, dict):
-                val = obj.get(name)
-            return val if val is not None else default
+            result = self.dispatcher.dispatch(
+                command_name, args, event, is_group,
+                image_path=stored_image_path, image_source="upload"
+            )
 
-        # Handle image prompt loop
-        image_prompt = _get_field(result, "ImagePrompt")
-        if image_prompt:
-            self._pending_images[user_id] = {
-                "command_name": command_name,
-                "args": args,
-                "is_group": is_group,
-                "timestamp": _time.time(),
-            }
-            yield event.plain_result(str(image_prompt))
-            return
+            if result is None:
+                yield event.plain_result(f"处理图片时出错: 未知命令 {command_name}")
+                return
 
-        msg = _get_field(result, "Message")
-        err = _get_field(result, "ErrorMessage")
-        output_image = _get_field(result, "OutputImagePath")
+            def _get_field(obj, name, default=None):
+                val = getattr(obj, name, None)
+                if val is None and isinstance(obj, dict):
+                    val = obj.get(name)
+                return val if val is not None else default
 
-        if err:
-            yield event.plain_result(str(err))
-        elif msg is not None or output_image:
-            if msg:
-                yield event.plain_result(str(msg))
-            if output_image:
-                yield event.image_result(str(output_image))
+            # Handle image prompt loop (module needs another image)
+            image_prompt = _get_field(result, "ImagePrompt")
+            if image_prompt:
+                self._pending_images[user_id] = {
+                    "command_name": command_name,
+                    "args": original_args,
+                    "stage": "waiting_image",
+                    "image_path": None,
+                    "is_group": is_group,
+                    "timestamp": _time.time(),
+                }
+                yield event.plain_result(str(image_prompt))
+                return
+
+            msg = _get_field(result, "Message")
+            err = _get_field(result, "ErrorMessage")
+            output_image = _get_field(result, "OutputImagePath")
+
+            if err:
+                yield event.plain_result(str(err))
+            elif msg is not None or output_image:
+                if msg:
+                    yield event.plain_result(str(msg))
+                if output_image:
+                    yield event.image_result(str(output_image))
 
     # === AstrBot 命令处理 ===
 
     @filter.command("hb")
     async def _gateway(self, event: AstrMessageEvent):
         """Horizon Bot 网关。用法: /hb <模块命令> [参数]"""
+        # Clear any pending interaction state for this user
+        user_id = str(event.get_sender_id())
+        self._pending_images.pop(user_id, None)
+
         message_str = self._strip_command(event, self.command_prefix)
         if not message_str:
             yield event.plain_result(
@@ -202,6 +251,8 @@ class HorizonBotModules(Star):
             self._pending_images[user_id] = {
                 "command_name": command_name,
                 "args": args,
+                "stage": "waiting_image",
+                "image_path": None,
                 "is_group": is_group,
                 "timestamp": __import__("time").time(),
             }
