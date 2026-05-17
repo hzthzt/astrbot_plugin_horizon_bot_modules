@@ -27,7 +27,7 @@ class CommandDispatcher:
         return cmd_name, args
 
     def dispatch(self, command_name: str, args: list, event,
-                 is_group: bool):
+                 is_group: bool, image_path: str = "", image_source: str = ""):
         """
         Find matching C# module handler, build context, call handler, return
         the C# HorizonModuleResult or a fallback dict with Success/Message.
@@ -50,6 +50,8 @@ class CommandDispatcher:
         ctx.SenderName = event.get_sender_name() or ""
         ctx.GroupId = str(self._extract_group_id(event)) if is_group else ""
         ctx.IsGroupMessage = is_group
+        ctx.ImagePath = image_path or ""
+        ctx.ImageSource = image_source or ""
 
         # Set module data path
         module_id = handler_info["module"].ModuleId

@@ -45,6 +45,8 @@ class HorizonBotModules(Star):
 
         self._load_modules()
 
+        self._pending_images: dict = {}  # {user_id: {command_name, args, is_group, timestamp}}
+
     async def terminate(self):
         self.loader.unload_all()
         logger.info("HorizonBotModules 已关闭。")
@@ -68,6 +70,90 @@ class HorizonBotModules(Star):
         if msg.startswith("/"):
             logger.info(f"已拦截斜杠命令: {msg[:80]}")
             event.stop_event()
+
+    @filter.on_waiting_llm_request()
+    async def _handle_pending_image(self, event: AstrMessageEvent):
+        """Intercept image messages when a module is waiting for one."""
+        user_id = str(event.get_sender_id())
+        if user_id not in self._pending_images:
+            return
+
+        # Clean stale pending entries (older than 5 minutes)
+        import time as _time
+        now = _time.time()
+        stale = [uid for uid, p in self._pending_images.items()
+                 if now - p.get("timestamp", 0) > 300]
+        for uid in stale:
+            del self._pending_images[uid]
+
+        if user_id not in self._pending_images:
+            return
+
+        # Check if message contains an image
+        from astrbot.api.message_components import Image
+        image_path = None
+        try:
+            for comp in event.message_obj.message:
+                if isinstance(comp, Image):
+                    image_path = await comp.convert_to_file_path()
+                    break
+        except Exception as e:
+            logger.error(f"Error extracting image from pending request: {e}")
+            return
+
+        if not image_path:
+            return  # User sent text, not an image -- let it pass through
+
+        event.stop_event()
+
+        pending = self._pending_images.pop(user_id)
+        command_name = pending["command_name"]
+        args = pending["args"]
+        is_group = pending["is_group"]
+
+        logger.info(
+            f"Processing pending image from user {user_id} "
+            f"for command '{command_name}'"
+        )
+
+        result = self.dispatcher.dispatch(
+            command_name, args, event, is_group,
+            image_path=image_path, image_source="upload"
+        )
+
+        if result is None:
+            yield event.plain_result(f"处理图片时出错: 未知命令 {command_name}")
+            return
+
+        def _get_field(obj, name, default=None):
+            val = getattr(obj, name, None)
+            if val is None and isinstance(obj, dict):
+                val = obj.get(name)
+            return val if val is not None else default
+
+        # Handle image prompt loop
+        image_prompt = _get_field(result, "ImagePrompt")
+        if image_prompt:
+            self._pending_images[user_id] = {
+                "command_name": command_name,
+                "args": args,
+                "is_group": is_group,
+                "timestamp": _time.time(),
+            }
+            yield event.plain_result(str(image_prompt))
+            return
+
+        msg = _get_field(result, "Message")
+        err = _get_field(result, "ErrorMessage")
+        output_image = _get_field(result, "OutputImagePath")
+
+        if err:
+            yield event.plain_result(str(err))
+        elif msg is not None or output_image:
+            if msg:
+                yield event.plain_result(str(msg))
+            if output_image:
+                yield event.image_result(str(output_image))
 
     # === AstrBot 命令处理 ===
 
@@ -103,17 +189,36 @@ class HorizonBotModules(Star):
             yield event.plain_result(f"未知命令: {command_name}")
             return
 
-        msg = getattr(result, "Message", None)
-        if msg is None and isinstance(result, dict):
-            msg = result.get("Message")
-        err = getattr(result, "ErrorMessage", None)
-        if err is None and isinstance(result, dict):
-            err = result.get("ErrorMessage")
+        def _get_field(obj, name, default=None):
+            val = getattr(obj, name, None)
+            if val is None and isinstance(obj, dict):
+                val = obj.get(name)
+            return val if val is not None else default
+
+        # Check if module is requesting an image from the user
+        image_prompt = _get_field(result, "ImagePrompt")
+        if image_prompt:
+            user_id = str(event.get_sender_id())
+            self._pending_images[user_id] = {
+                "command_name": command_name,
+                "args": args,
+                "is_group": is_group,
+                "timestamp": __import__("time").time(),
+            }
+            yield event.plain_result(str(image_prompt))
+            return
+
+        msg = _get_field(result, "Message")
+        err = _get_field(result, "ErrorMessage")
+        output_image = _get_field(result, "OutputImagePath")
 
         if err:
             yield event.plain_result(str(err))
-        elif msg is not None:
-            yield event.plain_result(str(msg))
+        elif msg is not None or output_image:
+            if msg:
+                yield event.plain_result(str(msg))
+            if output_image:
+                yield event.image_result(str(output_image))
 
     @filter.command("hb_version")
     async def _version(self, event: AstrMessageEvent):
