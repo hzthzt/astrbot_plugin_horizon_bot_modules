@@ -2,12 +2,13 @@
 
 基于 pythonnet 加载和管理 C# Horizon Bot 模块的 AstrBot 插件。
 
-**当前版本: v1.0.6** | 发送 `/hb version` 查看运行中版本
+**当前版本: v1.0.7** | 发送 `/hb version` 查看运行中版本
 
 ## 更新日志
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
+| v1.0.7 | 2026-05-17 | 新增图片交互支持：ImagePath/ImageSource 传递、三阶段状态机 (waiting_image → waiting_prompt → dispatch)、消息拦截防 LLM 泄露 |
 | v1.0.6 | 2026-05-17 | HorizonCommandContext 新增 DataPath 字段，每个模块拥有独立数据目录 `plugin_data/horizon_bot_modules/data/<module_id>/` |
 | v1.0.5 | 2026-05-17 | 新增 `/hb_help` 指令，列出插件和已加载模块的所有可用命令及描述 |
 | v1.0.4 | 2026-05-17 | 修复命令消息解析（/hb/about/help 等）；修复斜杠拦截从原始消息链检测；修复 API 路由动态匹配插件名；模块管理页面改用 bridge SDK |
@@ -64,3 +65,29 @@
 ## 模块开发
 
 C# 模块 SDK 及开发文档请见 [horizon-bot](https://github.com/example/horizon-bot) 仓库。
+
+## 架构
+
+```
+QQ 消息 → AstrBot → Python 插件 → pythonnet → C# 模块 Handler → 返回纯数据 → Python 发送回复
+```
+
+C# 模块不接触 QQ API，仅接收 `HorizonCommandContext`（纯数据对象）并返回 `HorizonModuleResult`（纯数据对象）。支持的返回类型：
+- **文本回复**: `Ok()` / `Fail()`
+- **图片输出**: `ImageOutput("text", "/path/to/image.png")`
+- **请求图片**: `PromptImage("请发送图片")` — 触发三阶段交互
+
+## 图片交互（三阶段）
+
+支持图片输入的模块使用以下流程：
+
+```
+用户: /hb command [args]
+  → C# 返回 PromptImage → Bot 回复 "请发送图片"
+用户: [发送图片]
+  → Bot 缓存图片 → 回复 "已收到图片，请发送描述"
+用户: [发送描述]
+  → C# 收到 ImagePath → 处理 → ImageOutput → Bot 发送结果
+```
+
+等候期间，该用户的所有消息被拦截，不会到达 LLM。
